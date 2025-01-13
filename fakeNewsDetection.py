@@ -47,3 +47,12 @@ plt.xlabel('Label', fontsize=12)
 plt.ylabel('Count', fontsize=12)
 #showing the graph 
 plt.show() 
+
+#attaching a lable map of true=1 false= 0
+combined_data["input"] = combined_data["title"] + "" +combined_data["text"]
+combined_data=combined_data[["input","label"]]
+combined_data = combined_data.copy()
+combined_data['label'] = combined_data['label'].map({'true' : 1, 'fake':0})
+print(combined_data.sample(7))  
+
+#tokenization and processing the data
