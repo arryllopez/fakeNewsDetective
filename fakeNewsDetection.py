@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from datasets import Dataset, DatasetDict
 
 #loading the dataset
 fake_dataset = pd.read_csv('archive/datasets/Fake.csv')
@@ -56,3 +57,4 @@ combined_data['label'] = combined_data['label'].map({'true' : 1, 'fake':0})
 print(combined_data.sample(7))  
 
 #tokenization and processing the data
+ds = Dataset.from_pandas(combined_data)
