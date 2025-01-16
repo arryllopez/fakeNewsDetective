@@ -2,7 +2,13 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
 from datasets import Dataset, DatasetDict
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import TrainingArguments, Trainer
+from IPython.display import FileLink
+import os 
+import shutil
 
 #loading the dataset
 fake_dataset = pd.read_csv('archive/datasets/Fake.csv')
@@ -56,5 +62,60 @@ combined_data = combined_data.copy()
 combined_data['label'] = combined_data['label'].map({'true' : 1, 'fake':0})
 print(combined_data.sample(7))  
 
+#----------------------------------------------------------
+
 #tokenization and processing the data
 ds = Dataset.from_pandas(combined_data)
+print(ds) 
+
+#importing the model (pretrained microsoft deBERTa)
+model = 'microsoft/deberta-v3-small'
+tokenizer = AutoTokenizer.from_pretrained(model) 
+
+def tok_func(x): 
+    return tokenizer(x["input"], padding="max_length", truncation=True, max_length=512)
+
+tok_ds = ds.map(tok_func, batched=True)
+
+print(tok_ds)
+
+row = tok_ds[0]
+row['input'], row['input_ids']
+
+tok_ds = tok_ds.rename_columns({'label':'labels'})
+
+tokenizer.tokenize(row['input'])
+
+dds = tok_ds.train_test_split(0.25, seed=42)
+
+def accuracy_metric(eval_pred):
+    logits, labels = eval_pred
+    preds = np.argmax(logits, axis=1)
+    accuracy = accuracy_score(labels, preds)
+    return {"accuracy": accuracy}
+
+bs = 16
+epochs = 4
+lr = 2e-5
+
+args = TrainingArguments('outputs', learning_rate=lr, warmup_ratio=0.1, lr_scheduler_type='cosine', fp16=True,
+    eval_strategy="epoch", per_device_train_batch_size=bs, per_device_eval_batch_size=bs*2,
+    num_train_epochs=epochs, weight_decay=0.01, report_to='none')
+
+fake_news_model = AutoModelForSequenceClassification.from_pretrained(model, num_labels=2)
+
+trainer = Trainer(fake_news_model, args, train_dataset=dds['train'], eval_dataset=dds['test'],
+                  tokenizer=tokenizer, compute_metrics=accuracy_metric)
+
+
+trainer.train();        
+
+fake_news_model.save_pretrained("./saved_model")
+tokenizer.save_pretrained("./saved_model")
+
+import os
+print(os.listdir("./saved_model"))
+
+shutil.make_archive("saved_model", 'zip', "./saved_model")
+
+FileLink("./saved_model.zip")
